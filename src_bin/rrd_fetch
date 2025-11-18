@@ -79,9 +79,9 @@ Pretty print the results.
 use strict;
 use warnings;
 use Getopt::Long qw(GetOptions);
-use JSON ();
-use Pod::Usage qw( pod2usage );
-use RRD::Fetch ();
+use JSON         ();
+use Pod::Usage   qw( pod2usage );
+use RRD::Fetch   ();
 
 sub main::VERSION_MESSAGE {
 	print 'rrd_fetch v. ' . $RRD::Fetch::VERSION . "\n";
@@ -102,9 +102,9 @@ my $retries;
 my $by;
 my $start;
 my $end;
-my $pretty=0;
+my $pretty = 0;
 my $for;
-my $daily_stats=0;
+my $daily_stats = 0;
 Getopt::Long::Configure('no_ignore_case');
 Getopt::Long::Configure('bundling');
 GetOptions(
@@ -120,8 +120,8 @@ GetOptions(
 	'B=s'     => \$by,
 	's=s'     => \$start,
 	'e=s'     => \$end,
-	'F=s' => \$for,
-	'ds' => \$daily_stats,
+	'F=s'     => \$for,
+	'ds'      => \$daily_stats,
 	'p'       => \$pretty,
 );
 
@@ -134,19 +134,19 @@ my $rrd_fetch = RRD::Fetch->new(
 );
 
 my $results;
-if ($daily_stats){
+if ($daily_stats) {
 	$results = $rrd_fetch->daily_stats(
 		'start' => $start,
 		'for'   => $for,
-		);	
-}else{
+	);
+} else {
 	$results = $rrd_fetch->fetch_joined(
 		'start' => $start,
 		'for'   => $end,
-		);
+	);
 }
 
-print JSON->new->utf8->pretty($pretty)->encode($results);
+print JSON->new->utf8->pretty($pretty)->canonical(1)->encode($results);
 if ( !$pretty ) {
 	print "\n";
 }

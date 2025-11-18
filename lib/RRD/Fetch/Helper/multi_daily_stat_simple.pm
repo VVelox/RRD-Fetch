@@ -51,6 +51,7 @@ sub new {
 		retries       => 3,
 		backoff       => 1,
 		rrd_files     => [],
+		'for'         => 7,
 		perror        => undef,
 		error         => undef,
 		errorLine     => undef,
@@ -59,12 +60,16 @@ sub new {
 		errorExtra    => {
 			all_errors_fatal => 0,
 			flags            => {
-				1 => 'rrd_files_undef',
+				1 => 'required_arg_undef',
 				2 => 'wrong_ref_type',
+				3 => 'rrd_fetcher_init_error',
+				4 => 'not_a_int',
 			},
 			fatal_flags => {
-				'not_a_file'     => 1,
-				'rrd_file_undef' => 1,
+				'wrong_ref_type'         => 1,
+				'required_arg_undef'     => 1,
+				'rrd_fetcher_init_error' => 1,
+				'not_a_int'              => 1,
 			},
 			perror_not_fatal => 0,
 		},
@@ -87,7 +92,7 @@ sub new {
 		return $self;
 	}
 
-	my @read_in = ( 'resolution', 'backoff', 'retries', 'CF' );
+	my @read_in = ( 'resolution', 'backoff', 'retries', 'CF', 'for' );
 	foreach my $to_read_in (@read_in) {
 		if ( defined( $opts{$to_read_in} ) ) {
 			$self->{$to_read_in} = $opts{$to_read_in};
@@ -150,11 +155,11 @@ sub run {
 	}
 
 	if ( !defined( $opts{start} ) ) {
-		$self->{error}       = 8;
+		$self->{error}       = 1;
 		$self->{errorString} = '$opts{start} is undef';
 		$self->warn;
 	} elsif ( ref( $opts{start} ) ne '' ) {
-		$self->{error}       = 4;
+		$self->{error}       = 2;
 		$self->{errorString} = '$opts{start} is of ref type "' . ref( $opts{start} ) . '" and not ""';
 		$self->warn;
 	} elsif ( $opts{start} !~ /\d\d\d\d[01]\d[0123]\d/ ) {
@@ -167,9 +172,9 @@ sub run {
 	}
 
 	if ( !defined( $opts{for} ) ) {
-		$opts{for} = 7;
+		$opts{for} = 1;
 	} elsif ( ref( $opts{for} ) ne '' ) {
-		$self->{error}       = 4;
+		$self->{error}       = 2;
 		$self->{errorString} = '$opts{for} is of ref type "' . ref( $opts{for} ) . '" and not ""';
 		$self->warn;
 	} elsif ( $opts{for} !~ /\d+/ ) {
@@ -212,31 +217,6 @@ sub run {
 				. '", end=>\'+1day\');"...';
 			$self->warn;
 		}
-
-		if ( $day == 1 ) {
-			$to_return->{'columns'} = $day_results->{'columns'};
-		}
-
-		$to_return->{'max'}{$current_day}    = {};
-		$to_return->{'min'}{$current_day}    = {};
-		$to_return->{'mean'}{$current_day}   = {};
-		$to_return->{'mode'}{$current_day}   = {};
-		$to_return->{'median'}{$current_day} = {};
-		$to_return->{'sum'}{$current_day}    = {};
-		foreach my $column ( @{ $to_return->{'columns'} } ) {
-			my @values;
-			foreach my $current_value ( @{ $day_results->{'data'}{$column} } ) {
-				if ( defined($current_value) && $current_value !~ /[Nn][Aa][Nn]/ ) {
-					push( @values, $current_value );
-				}
-			}
-			$to_return->{'max'}{$current_day}{$column}    = sprintf( '%.12f', max(@values) );
-			$to_return->{'min'}{$current_day}{$column}    = sprintf( '%.12f', min(@values) );
-			$to_return->{'sum'}{$current_day}{$column}    = sprintf( '%.12f', sum(@values) );
-			$to_return->{'mean'}{$current_day}{$column}   = sprintf( '%.12f', mean(@values) );
-			$to_return->{'mode'}{$current_day}{$column}   = sprintf( '%.12f', mode(@values) );
-			$to_return->{'median'}{$current_day}{$column} = sprintf( '%.12f', median(@values) );
-		} ## end foreach my $column ( @{ $to_return->{'columns'}...})
 
 		$t += 86400;
 		$day++;
