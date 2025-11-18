@@ -5,6 +5,8 @@ use 5.006;
 use strict;
 use warnings;
 use String::ShellQuote qw(shell_quote);
+use Time::Piece        ();
+use Statistics::Lite   qw(max mean median min mode sum);
 
 =head1 NAME
 
@@ -86,18 +88,24 @@ sub new {
 				9  => 'end_undef',
 				10 => 'bad_by_opt',
 				11 => 'no_columns',
+				12 => 'start_wrong_format',
+				13 => 'start_failed_parsing',
+				14 => 'fetching_a_day_failed',
 			},
 			fatal_flags => {
-				'not_a_file'     => 1,
-				'rrd_file_undef' => 1,
-				'wrong_ref_type' => 1,
-				'not_a_int'      => 1,
-				'less_than_1'    => 1,
-				'CF_bad'         => 1,
-				'start_undef'    => 1,
-				'end_undef'      => 1,
-				'bad_by_opt'     => 1,
-				'no_columns'     => 1,
+				'not_a_file'            => 1,
+				'rrd_file_undef'        => 1,
+				'wrong_ref_type'        => 1,
+				'not_a_int'             => 1,
+				'less_than_1'           => 1,
+				'CF_bad'                => 1,
+				'start_undef'           => 1,
+				'end_undef'             => 1,
+				'bad_by_opt'            => 1,
+				'no_columns'            => 1,
+				'start_wrong_format'    => 1,
+				'start_failed_parsing'  => 1,
+				'fetching_a_day_failed' => 1,
 			},
 			perror_not_fatal => 0,
 		},
@@ -416,7 +424,7 @@ sub fetch_joined {
 				push( @{ $results->{rows} }, $line_split[0] );
 				foreach my $column (@columns) {
 					if ( defined( $line_split[$my_read] ) ) {
-						push(@{$results->{data}{$column}}, $line_split[$my_read]);
+						push( @{ $results->{data}{$column} }, $line_split[$my_read] );
 					} else {
 						$results->{data}{$column} = undef;
 					}
@@ -451,6 +459,133 @@ sub fetch_joined {
 	return $results;
 } ## end sub fetch_joined
 
+=head1 daily_max
+
+Gets daily max info.
+
+Requires a start time and end time in 
+
+    - start :: Start time in %Y%m%d
+        Default :: undef
+
+    - for :: Number of days to get info on.
+        Default :: 7
+
+The return is is a hash ref for column by is as below.
+
+    - .columns[] :: A array of the columns.
+
+    - .dates[] :: A array of dates.
+
+    . .max.$date.$column :: The max info for a specific column on that date.
+
+=cut
+
+sub daily_stats {
+	my ( $self, %opts ) = @_;
+
+	if ( !$self->errorblank ) {
+		return undef;
+	}
+
+	if ( !defined( $opts{start} ) ) {
+		$self->{error}       = 8;
+		$self->{errorString} = '$opts{start} is undef';
+		$self->warn;
+	} elsif ( ref( $opts{start} ) ne '' ) {
+		$self->{error}       = 4;
+		$self->{errorString} = '$opts{start} is of ref type "' . ref( $opts{start} ) . '" and not ""';
+		$self->warn;
+	} elsif ( $opts{start} !~ /\d\d\d\d[01]\d[0123]\d/ ) {
+		$self->{error} = 12;
+		$self->{errorString}
+			= '$opts{start} set to "'
+			. $opts{start}
+			. '" which does not appear to be %Y%m%d or /\d\d\d\d[01]\d[0123]\d/';
+		$self->warn;
+	}
+
+	if ( !defined( $opts{for} ) ) {
+		$opts{for} = 7;
+	} elsif ( ref( $opts{for} ) ne '' ) {
+		$self->{error}       = 4;
+		$self->{errorString} = '$opts{for} is of ref type "' . ref( $opts{for} ) . '" and not ""';
+		$self->warn;
+	} elsif ( $opts{for} !~ /\d+/ ) {
+		$self->{error}       = 5;
+		$self->{errorString} = '$opts{for}, "' . $opts{for} . '", does not appear to be a int';
+		$self->warn;
+	}
+
+	my $t;
+	eval {
+		$t = Time::Piece->strptime( $opts{start}, '%Y%m%d' );
+		if ( !defined($t) ) {
+			die('Time::Piece->strptime returned undef');
+		}
+	};
+	if ($@) {
+		$self->{error}       = 13;
+		$self->{errorString} = '$opts{start}, "' . $opts{start} . '", failed parsing... ' . $@;
+		$self->warn;
+	}
+
+	my $to_return = {
+		'columns' => [],
+		'dates'   => [],
+		'max'     => {},
+	};
+
+	my $day = 1;
+	while ( $day <= $opts{for} ) {
+		my $current_day = $t->strftime('%Y%m%d');
+		push( @{ $to_return->{'dates'} }, $current_day );
+
+		my $day_results = $self->fetch_joined( 'start' => $current_day, 'end' => '+1day' );
+
+		if ( !$day_results->{'success'} ) {
+			$self->{error} = 14;
+			$self->{errorString}
+				= '$day_results->{success} is false... called "$self->(start=>"'
+				. $current_day
+				. '", end=>\'+1day\');"...';
+			$self->warn;
+		}
+
+		if ( $day == 1 ) {
+			$to_return->{'columns'} = $day_results->{'columns'};
+		}
+
+		$to_return->{'max'}{$current_day}    = {};
+		$to_return->{'min'}{$current_day}    = {};
+		$to_return->{'mean'}{$current_day}   = {};
+		$to_return->{'mode'}{$current_day}   = {};
+		$to_return->{'median'}{$current_day} = {};
+		$to_return->{'sum'}{$current_day}    = {};
+		foreach my $column ( @{ $to_return->{'columns'} } ) {
+			my @values;
+			foreach my $current_value ( @{ $day_results->{'data'}{$column} } ) {
+				if ( defined($current_value) && $current_value !~ /[Nn][Aa][Nn]/ ) {
+					push( @values, $current_value );
+				}
+			}
+			$to_return->{'max'}{$current_day}{$column}    = sprintf('%.12f',max(@values));
+			$to_return->{'min'}{$current_day}{$column}    = sprintf('%.12f',min(@values));
+			$to_return->{'sum'}{$current_day}{$column}    = sprintf('%.12f',sum(@values));
+			$to_return->{'mean'}{$current_day}{$column}   = sprintf('%.12f',mean(@values));
+			$to_return->{'mode'}{$current_day}{$column}   = sprintf('%.12f',mode(@values));
+			$to_return->{'median'}{$current_day}{$column} = sprintf('%.12f',median(@values));
+		} ## end foreach my $column ( @{ $to_return->{'columns'}...})
+
+		$t += 86400;
+		$day++;
+	} ## end while ( $day <= $opts{for} )
+
+	return $to_return;
+} ## end sub daily_stats
+
+=head2
+
 =head1 ERROR CODES/FLAGS
 
 =head2 1/not_a_file
@@ -470,6 +605,8 @@ rrdtool exited zero and number of retries has been exceeded.
 The specified variable is of the wrong ref type.
 
 =head2 5/not_a_int
+
+Value is not a int.
 
 =head2 6/less_than_1
 
@@ -500,6 +637,18 @@ The value for $opts{by} is not recognized. See the docs for fetch_joined.
 
 Unable to retrieve any columns info. Parsing failed for some reason, likely due to bad data.
 
+=head2 12/start_wrong_format
+
+The value for start is not in the format %Y%m%d.
+
+=head2 13/start_failed_parsing
+
+The value passed for start could not be parsed via Time::Piece. Expected for mat is %Y%m%d.
+
+=head2 14/fetching_a_day_failed
+
+Failed to fetch information for a a day.
+
 =head1 AUTHOR
 
 Zane C. Bowers-Hadley, C<< <vvelox at vvelox.net> >>
@@ -509,9 +658,6 @@ Zane C. Bowers-Hadley, C<< <vvelox at vvelox.net> >>
 Please report any bugs or feature requests to C<bug-rrd-fetch at rt.cpan.org>, or through
 the web interface at L<https://rt.cpan.org/NoAuth/ReportBug.html?Queue=RRD-Fetch>.  I will be notified, and then you'll
 automatically be notified of progress on your bug as I make changes.
-
-
-
 
 =head1 SUPPORT
 

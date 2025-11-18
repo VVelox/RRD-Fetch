@@ -9,15 +9,28 @@ rrd_fetch - A wrapper for "rrdtool fetch" that dumps the results to JSON.
 rrd_fetch B<-f> <file> B<-s> <start> B<-e> <end>  [B<-c> <CF>] [B<-r> <resolution>]
 [B<-b> <backoff>] [B<-R> <retries>] [B<-B> <by>] [B<-p>]
 
+rrd_fetch B<-f> --ds <file> B<-s> <start> [B<-F> <days>] [B<-c> <CF>] [B<-r> <resolution>]
+[B<-b> <backoff>] [B<-R> <retries>] [B<-B> <by>] [B<-p>]
+
 =head1 DESCRIPTION
 
 For information on the JSON output, see fetch_joined for L<RRD::Fetch>.
 
 =head1 FLAGS
 
+=head2 --ds
+
+Print out daily stats information.
+
 =head2 -f <config file>
 
 The config file to use.
+
+=head2 -F <days>
+
+How many days daily stat stuff should be done for.
+
+Default :: 7
 
 =head2 -s <start>
 
@@ -90,6 +103,8 @@ my $by;
 my $start;
 my $end;
 my $pretty=0;
+my $for;
+my $daily_stats=0;
 Getopt::Long::Configure('no_ignore_case');
 Getopt::Long::Configure('bundling');
 GetOptions(
@@ -105,22 +120,31 @@ GetOptions(
 	'B=s'     => \$by,
 	's=s'     => \$start,
 	'e=s'     => \$end,
+	'F=s' => \$for,
+	'ds' => \$daily_stats,
 	'p'       => \$pretty,
 );
 
 my $rrd_fetch = RRD::Fetch->new(
-	rrd_file   => $rrd_file,
-	CF         => $CF,
-	resolution => $resolution,
-	backoff    => $backoff,
-	retries    => $retries,
+	'rrd_file'   => $rrd_file,
+	'CF'         => $CF,
+	'resolution' => $resolution,
+	'backoff'    => $backoff,
+	'retries'    => $retries,
 );
 
-my $results = $rrd_fetch->fetch_joined(
-	start => $start,
-	end   => $end,
-	by    => $by,
-);
+my $results;
+if ($daily_stats){
+	$results = $rrd_fetch->daily_stats(
+		'start' => $start,
+		'for'   => $for,
+		);	
+}else{
+	$results = $rrd_fetch->fetch_joined(
+		'start' => $start,
+		'for'   => $end,
+		);
+}
 
 print JSON->new->utf8->pretty($pretty)->encode($results);
 if ( !$pretty ) {
