@@ -1,0 +1,74 @@
+#!perl
+
+=head1 NAME
+
+rrd_fetch_helper - 
+
+=head1 SYNOPSIS
+
+
+=head1 DESCRIPTION
+
+For information on the JSON output, see fetch_joined for L<RRD::Fetch>.
+
+=head1 FLAGS
+
+
+=cut
+
+use strict;
+use warnings;
+use Getopt::Long qw(GetOptions);
+use JSON         ();
+use Pod::Usage   qw( pod2usage );
+use RRD::Fetch   ();
+
+sub main::VERSION_MESSAGE {
+	print 'rrd_fetch_helper v. ' . $RRD::Fetch::VERSION . "\n";
+	exit 255;
+}
+
+sub main::HELP_MESSAGE {
+	pod2usage( -exitval => 255, -verbose => 2, -output => \*STDOUT, );
+}
+
+my $help;
+my $version;
+my @rrd_files;
+my $CF;
+my $resolution;
+my $backoff;
+my $retries;
+my $start;
+my $pretty = 0;
+my $for;
+Getopt::Long::Configure('no_ignore_case');
+Getopt::Long::Configure('bundling');
+GetOptions(
+	'version' => \$version,
+	'v'       => \$version,
+	'help'    => \$help,
+	'h'       => \$help,
+	'r=s'     => \@rrd_files,
+	'f=s'     => \$for,
+	'p=s'     => $pretty,
+);
+
+my $rrd_fetch = RRD::Fetch->new(
+	'rrd_files'  => \@rrd_files,
+	'CF'         => $CF,
+	'resolution' => $resolution,
+	'backoff'    => $backoff,
+	'retries'    => $retries,
+);
+
+use RRD::Fetch::Helper::multi_daily_stat_simple ();
+
+my $helper = RRD::Fetch::Helper::multi_daily_stat_simple->new(rrd_files=>\@rrd_files);
+
+my $results=$helper->run;
+
+print JSON->new->utf8->pretty($pretty)->encode($results);
+if ( !$pretty ) {
+	print "\n";
+}
