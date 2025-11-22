@@ -21,6 +21,7 @@ my %WriteMakefileArgs = (
 	PREREQ_PM => {
 		'String::ShellQuote' => '0',
 		'JSON'               => '0',
+		'File::Slurp'        => '0',
 	},
 	dist  => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
 	clean => { FILES    => 'RRD-Fetch-*' },
