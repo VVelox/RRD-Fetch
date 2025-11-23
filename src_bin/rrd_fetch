@@ -142,7 +142,7 @@ if ($daily_stats) {
 } else {
 	$results = $rrd_fetch->fetch_joined(
 		'start' => $start,
-		'for'   => $end,
+		'end'   => $end,
 	);
 }
 

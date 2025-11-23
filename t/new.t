@@ -5,7 +5,7 @@ use warnings;
 use Test::More;
 
 BEGIN {
-        use_ok('RRD::Fetch') || print "Bail out!\n";
+        use_ok('RRD::Fetch') || print "Bail out!\n`";
 }
 
 my $worked = 0;
@@ -109,7 +109,7 @@ ok( $worked eq '1', 'new good backoff' ) or diag( "new good backoff test died wi
 
 $worked = 0;
 eval {
-	my $rrd_fetch=RRD::Fetch->new(rrd_file=>'t/data/ucd_load.rrd', CF=>'MIN', backoff=>333, resolution=>22,retries=>1);
+	my $rrd_fetch=RRD::Fetch->new(rrd_file=>'t/data/ucd_load.rrd', CF=>'MIN', backoff=>333, resolution=>22,retries=>1, align=>0);
 	if ($rrd_fetch->{backoff} ne '333'){
 		die('$rrd_fetch->{backoff} not set to 333');
 	}
@@ -121,6 +121,9 @@ eval {
 	}
 	if ($rrd_fetch->{retries} ne '1'){
 		die('$rrd_fetch->{retries} not set to 1');
+	}
+	if ($rrd_fetch->{align} ne '0'){
+		die('$rrd_fetch->{align} not set to 0');
 	}
 	$worked = 1;
 };

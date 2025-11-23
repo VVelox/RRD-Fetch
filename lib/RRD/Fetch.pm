@@ -57,6 +57,10 @@ The following are optional.
         Default :: 3
         Type :: int
 
+    - align :: Call with --align-start.
+        Default :: 1
+        Type :: bool
+
 =cut
 
 sub new {
@@ -69,6 +73,7 @@ sub new {
 		rrd_file        => undef,
 		quoted_rrd_file => undef,
 		resolution      => undef,
+		align           => 1,
 		perror          => undef,
 		error           => undef,
 		errorLine       => undef,
@@ -160,7 +165,7 @@ sub new {
 		$self->{CF} = $opts{CF};
 	} ## end if ( defined( $opts{CF} ) )
 
-	my @int_read = ( 'resolution', 'backoff', 'retries' );
+	my @int_read = ( 'resolution', 'backoff', 'retries', 'align' );
 	foreach my $int_to_read_in (@int_read) {
 		if ( defined( $opts{$int_to_read_in} ) ) {
 			if ( ref( $opts{$int_to_read_in} ) ne '' ) {
@@ -180,7 +185,7 @@ sub new {
 				$self->{errorString} = '$opts{' . $int_to_read_in . '} is defined and does not appear to be a integer';
 				$self->warn;
 				return $self;
-			} elsif ( $int_to_read_in ne 'retries' && $opts{$int_to_read_in} <= 0 ) {
+			} elsif ( ( $int_to_read_in ne 'retries' && $int_to_read_in ne 'align' ) && $opts{$int_to_read_in} <= 0 ) {
 				# retries may be less than one to disable it
 				$self->{perror} = 1;
 				$self->{error}  = 6;
@@ -270,14 +275,19 @@ sub fetch_raw {
 		$resolution_opts = '--resolution ' . $self->{resolution};
 	}
 
+	my $align = '';
+	if ( $self->{'align'} ) {
+		$align = '--align-start';
+	}
+
 	$to_return->{output}
-		= `rrdtool fetch $self->{quoted_rrd_file} $self->{CF} $resolution_opts --start $opts{start} --end $opts{end}`;
+		= `rrdtool fetch $self->{quoted_rrd_file} $self->{CF} $resolution_opts --start $opts{start} --end $opts{end} $align`;
 	if ( $? != 0 ) {
 		$to_return->{retries}++;
 		my $loop = 1;
 		while ( $to_return->{retries} <= $self->{retries} && $loop ) {
 			$to_return->{output}
-				= `rrdtool fetch $self->{quoted_rrd_file} $self->{CF} $resolution_opts --start $opts{start} --end $opts{end}`;
+				= `rrdtool fetch $self->{quoted_rrd_file} $self->{CF} $resolution_opts --start $opts{start} --end $opts{end} $align`;
 			if ( $? != 0 ) {
 				$to_return->{retries}++;
 			} else {
@@ -297,7 +307,8 @@ sub fetch_raw {
 				. ' --start '
 				. $opts{start}
 				. ' --end '
-				. $opts{end} . '"';
+				. $opts{end} . '" '
+				. $align;
 			$self->warn;
 			return $to_return;
 		} ## end if ( $to_return->{retries} > $self->{retries...})
@@ -541,7 +552,7 @@ sub daily_stats {
 		my $current_day = $t->strftime('%Y%m%d');
 		push( @{ $to_return->{'dates'} }, $current_day );
 
-		my $day_results = $self->fetch_joined( 'start' => $current_day, 'end' => '+1day' );
+		my $day_results = $self->fetch_joined( 'start' => $current_day, 'end' => 'start+1day' );
 
 		if ( !$day_results->{'success'} ) {
 			$self->{error} = 14;
@@ -569,12 +580,12 @@ sub daily_stats {
 					push( @values, $current_value );
 				}
 			}
-			$to_return->{'max'}{$current_day}{$column}    = sprintf('%.12f',max(@values));
-			$to_return->{'min'}{$current_day}{$column}    = sprintf('%.12f',min(@values));
-			$to_return->{'sum'}{$current_day}{$column}    = sprintf('%.12f',sum(@values));
-			$to_return->{'mean'}{$current_day}{$column}   = sprintf('%.12f',mean(@values));
-			$to_return->{'mode'}{$current_day}{$column}   = sprintf('%.12f',mode(@values));
-			$to_return->{'median'}{$current_day}{$column} = sprintf('%.12f',median(@values));
+			$to_return->{'max'}{$current_day}{$column}    = sprintf( '%.12f', max(@values) );
+			$to_return->{'min'}{$current_day}{$column}    = sprintf( '%.12f', min(@values) );
+			$to_return->{'sum'}{$current_day}{$column}    = sprintf( '%.12f', sum(@values) );
+			$to_return->{'mean'}{$current_day}{$column}   = sprintf( '%.12f', mean(@values) );
+			$to_return->{'mode'}{$current_day}{$column}   = sprintf( '%.12f', mode(@values) );
+			$to_return->{'median'}{$current_day}{$column} = sprintf( '%.12f', median(@values) );
 		} ## end foreach my $column ( @{ $to_return->{'columns'}...})
 
 		$t += 86400;
