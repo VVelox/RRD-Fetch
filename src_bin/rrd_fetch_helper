@@ -6,10 +6,14 @@ rrd_fetch_helper -
 
 =head1 SYNOPSIS
 
+rrd_fetch_helper -a <action> ...
+
+rrd_fetch_helper --help [B<-a> <action>]
+
+rrd_fetch_helper -a list_actions
 
 =head1 DESCRIPTION
 
-For information on the JSON output, see fetch_joined for L<RRD::Fetch>.
 
 =head1 FLAGS
 
@@ -19,56 +23,59 @@ For information on the JSON output, see fetch_joined for L<RRD::Fetch>.
 use strict;
 use warnings;
 use Getopt::Long qw(GetOptions);
-use JSON         ();
 use Pod::Usage   qw( pod2usage );
-use RRD::Fetch   ();
+use RRD::Fetch::Helper;
+use Pod::Find qw(pod_where);
 
 sub main::VERSION_MESSAGE {
-	print 'rrd_fetch_helper v. ' . $RRD::Fetch::VERSION . "\n";
-	exit 255;
-}
-
-sub main::HELP_MESSAGE {
-	pod2usage( -exitval => 255, -verbose => 2, -output => \*STDOUT, );
+	print 'rrd_fetch_helper v. ' . $RRD::Fetch::Helper::VERSION . "\n";
 }
 
 my $help;
 my $version;
-my @rrd_files;
-my $CF;
-my $resolution;
-my $backoff;
-my $retries;
-my $start;
-my $pretty = 0;
-my $for;
+my $action;
 Getopt::Long::Configure('no_ignore_case');
 Getopt::Long::Configure('bundling');
+use Getopt::Long qw(:config pass_through);
 GetOptions(
 	'version' => \$version,
 	'v'       => \$version,
 	'help'    => \$help,
 	'h'       => \$help,
-	'r=s'     => \@rrd_files,
-	'f=s'     => \$for,
-	'p=s'     => $pretty,
+	'a=s' => \$action,
 );
 
-my $rrd_fetch = RRD::Fetch->new(
-	'rrd_files'  => \@rrd_files,
-	'CF'         => $CF,
-	'resolution' => $resolution,
-	'backoff'    => $backoff,
-	'retries'    => $retries,
-);
-
-use RRD::Fetch::Helper::multi_daily_stat_simple ();
-
-my $helper = RRD::Fetch::Helper::multi_daily_stat_simple->new(rrd_files=>\@rrd_files);
-
-my $results=$helper->run;
-
-print JSON->new->utf8->pretty($pretty)->encode($results);
-if ( !$pretty ) {
-	print "\n";
+if ($version) {
+	&VERSION_MESSAGE;
+	exit 255;
 }
+
+if ($help) {
+	&VERSION_MESSAGE;
+
+	print '
+
+-a <action>       The action to perform.
+
+';
+
+	if ( !defined($action) ) {
+		print 'For help on a specific topic use --help with the specified action in question.
+
+For a list of actions use the action list_actions
+';
+		exit 0;
+	}
+
+	print "Action specific help... \n\n";
+	pod2usage(
+		-input   => pod_where( { -inc => 1 }, 'RRD::Fetch::Helper::' . $action, ),
+		-verbose => 99,
+		-output  => \*STDOUT
+	);
+
+	exit 0;
+} ## end if ($help)
+
+my $rrd_fetch_helper=RRD::Fetch::Helper->new;
+$rrd_fetch_helper->run('action'=>$action);

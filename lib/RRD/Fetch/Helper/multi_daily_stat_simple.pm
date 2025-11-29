@@ -4,12 +4,12 @@ use base 'Error::Helper';
 use 5.006;
 use strict;
 use warnings;
-use Time::Piece      ();
-use Statistics::Lite qw(max mean median min mode sum);
+use String::ShellQuote qw( shell_quote );
+use JSON;
 
 =head1 NAME
 
-RRD::Fetch - Fetch information from a RRD file.
+RRD::Fetch::Helper::multi_daily_stats_simple - Fetch information from a RRD file.
 
 =head1 VERSION
 
@@ -21,209 +21,105 @@ our $VERSION = '0.0.1';
 
 =head1 SYNOPSIS
 
-    use RRD::Fetch::Helper::multi_daily_stat_simple;
 
-=head1 METHODS
-
-=head2 new
-
-Initiates the object.
-
-The required args are as below.
-
-    - rrd_files[] :: The RRD file to operate on. It needs to exist at the time it is called.
-        Default :: undef
-
-The following are optional and will be passed to to 
-
-    CF
-    resolution
-    backoff
-    retries
 
 =cut
 
-sub new {
-	my ( $empty, %opts ) = @_;
-
-	my $self = {
-		CF            => 'AVERAGE',
-		retries       => 3,
-		backoff       => 1,
-		rrd_files     => [],
-		'for'         => 7,
-		perror        => undef,
-		error         => undef,
-		errorLine     => undef,
-		errorFilename => undef,
-		errorString   => "",
-		errorExtra    => {
-			all_errors_fatal => 0,
-			flags            => {
-				1 => 'required_arg_undef',
-				2 => 'wrong_ref_type',
-				3 => 'rrd_fetcher_init_error',
-				4 => 'not_a_int',
-			},
-			fatal_flags => {
-				'wrong_ref_type'         => 1,
-				'required_arg_undef'     => 1,
-				'rrd_fetcher_init_error' => 1,
-				'not_a_int'              => 1,
-			},
-			perror_not_fatal => 0,
-		},
-	};
-	bless $self;
-
-	if ( !defined( $opts{'rrd_files'} ) ) {
-		$self->{perror}      = 1;
-		$self->{error}       = 1;
-		$self->{errorString} = '$opts{rrd_files} is undef';
-		$self->warn;
-		return $self;
-	}
-
-	if ( ref( $opts{'rrd_files'} ) ne 'ARRAY' ) {
-		$self->{perror}      = 1;
-		$self->{error}       = 2;
-		$self->{errorString} = '$opts{rrd_files} is of ref type "' . ref( $opts{rrd_file} ) . '" and not "ARRAY"';
-		$self->warn;
-		return $self;
-	}
-
-	my @read_in = ( 'resolution', 'backoff', 'retries', 'CF', 'for' );
-	foreach my $to_read_in (@read_in) {
-		if ( defined( $opts{$to_read_in} ) ) {
-			$self->{$to_read_in} = $opts{$to_read_in};
-		}
-	}
-
-	my $rrd_files_int = 0;
-	while ( defined( $opts{'rrd_files'}[$rrd_files_int] ) ) {
-		if ( ref( $opts{'rrd_files'}[$rrd_files_int] ) ne '' ) {
-			$self->{perror} = 1;
-			$self->{error}  = 2;
-			$self->{errorString}
-				= '$opts{rrd_files}[' . $rrd_files_int . '] is of ref type "' . ref( $opts{rrd_file} ) . '" and not ""';
-			$self->warn;
-			return $self;
-		}
-
-		my $rrd_fetcher;
-		eval {
-			$rrd_fetcher = RRD::Fetch->new(
-				'rrd_file'   => $opts{'rrd_files'}[$rrd_files_int],
-				'CF'         => $self->{'CF'},
-				'retries'    => $self->{'retries'},
-				'backoff'    => $self->{'backoff'},
-				'resolution' => $self->{'resolution'},
-			);
-			if ( !defined($rrd_fetcher) ) {
-				die(      'RRD::Fetcher->new(rrd_file=>"'
-						. $opts{'rrd_files'}[$rrd_files_int]
-						. '", CF=>"'
-						. $self->{'CF'}
-						. '", retries=>"'
-						. $self->{'retries'}
-						. '", backoff=>"'
-						. $self->{'backoff'}
-						. '", resolution=>"'
-						. $self->{'resolution'}
-						. '") returned undef' );
-			} ## end if ( !defined($rrd_fetcher) )
-		};
-		if ($@) {
-			$self->{perror}      = 1;
-			$self->{error}       = 3;
-			$self->{errorString} = 'Failed to init RRD::Fetcher... ' . $@;
-			$self->warn;
-			return $self;
-		}
-
-		$rrd_files_int++;
-	} ## end while ( defined( $opts{'rrd_files'}[$rrd_files_int...]))
-
-	return $self;
-} ## end sub new
-
-sub run {
+sub action {
 	my ( $self, %opts ) = @_;
-
-	if ( !$self->errorblank ) {
-		return undef;
+	
+	if ( !defined( $opts{'user'} ) ) {
+		$opts{'user'} = 'librenms';
 	}
 
-	if ( !defined( $opts{start} ) ) {
-		$self->{error}       = 1;
-		$self->{errorString} = '$opts{start} is undef';
-		$self->warn;
-	} elsif ( ref( $opts{start} ) ne '' ) {
-		$self->{error}       = 2;
-		$self->{errorString} = '$opts{start} is of ref type "' . ref( $opts{start} ) . '" and not ""';
-		$self->warn;
-	} elsif ( $opts{start} !~ /\d\d\d\d[01]\d[0123]\d/ ) {
-		$self->{error} = 12;
-		$self->{errorString}
-			= '$opts{start} set to "'
-			. $opts{start}
-			. '" which does not appear to be %Y%m%d or /\d\d\d\d[01]\d[0123]\d/';
-		$self->warn;
+	if ( !defined( $opts{'command'} ) ) {
+		$opts{'command'} = 'sudo -u %%%user%%%';
 	}
 
-	if ( !defined( $opts{for} ) ) {
-		$opts{for} = 1;
-	} elsif ( ref( $opts{for} ) ne '' ) {
-		$self->{error}       = 2;
-		$self->{errorString} = '$opts{for} is of ref type "' . ref( $opts{for} ) . '" and not ""';
-		$self->warn;
-	} elsif ( $opts{for} !~ /\d+/ ) {
-		$self->{error}       = 5;
-		$self->{errorString} = '$opts{for}, "' . $opts{for} . '", does not appear to be a int';
-		$self->warn;
-	}
-
-	my $t;
-	eval {
-		$t = Time::Piece->strptime( $opts{start}, '%Y%m%d' );
-		if ( !defined($t) ) {
-			die('Time::Piece->strptime returned undef');
+	if ( !defined( $opts{'ldir'} ) ) {
+		if ( -d '/home/librenms/librenms' ) {
+			$opts{'ldir'} = '/home/librenms/librenms';
+		} elsif ( -d '/usr/local/www/librenms' ) {
+			$opts{'ldir'} = '/usr/local/www/librenms';
+		} else {
+			$opts{'ldir'} = '/opt/librenms';
 		}
-	};
-	if ($@) {
-		$self->{error}       = 13;
-		$self->{errorString} = '$opts{start}, "' . $opts{start} . '", failed parsing... ' . $@;
-		$self->warn;
+	}
+	if ( !-d $opts{'ldir'} ) {
+		die( '--ldir, "' . $opts{'ldir'} . '", is not a dir or does not exist' );
 	}
 
-	my $to_return = {
-		'columns' => [],
-		'dates'   => [],
-		'max'     => {},
-	};
+	my $lnms = $opts{'ldir'} . '/lnms';
+	if ( !-f $lnms ) {
+		die( '"' . $lnms . '" is not a file or does not exist' );
+	} elsif ( !-x $lnms ) {
+		die( '"' . $lnms . '" is not executable' );
+	}
 
-	my $day = 1;
-	while ( $day <= $opts{for} ) {
-		my $current_day = $t->strftime('%Y%m%d');
-		push( @{ $to_return->{'dates'} }, $current_day );
+	if ( !defined( $opts{'rdir'} ) ) {
+		$opts{'rdir'} = '%%%ldir%%%/rrd';
+	}
+	$opts{'rdir'} =~ s/\%\%\%ldir\%\%\%/$opts{'ldir'}/g;
 
-		my $day_results = $self->fetch_joined( 'start' => $current_day, 'end' => '+1day' );
+	my $command = $opts{'command'};
+	$command =~ s/\%\%\%user\%\%\%/$opts{'user'}/g;
+	$command = $command . ' ' . $lnms;
 
-		if ( !$day_results->{'success'} ) {
-			$self->{error} = 14;
-			$self->{errorString}
-				= '$day_results->{success} is false... called "$self->(start=>"'
-				. $current_day
-				. '", end=>\'+1day\');"...';
-			$self->warn;
-		}
+	my $report_devices_command = $command . ' report:devices -r applications';
+	if ( defined( $opts{'dev'} ) ) {
+		$report_devices_command = $report_devices_command . ' ' . shell_quote( $opts{'dev'} );
+	}
+	$report_devices_command = $report_devices_command . ' 2>&1';
 
-		$t += 86400;
-		$day++;
-	} ## end while ( $day <= $opts{for} )
+	my $report_devices_output = `$report_devices_command`;
+	if ( $? != 0 ) {
+		die( '"' . $report_devices_command . '" exited non-zero with "' . $report_devices_output . '"' );
+	}
 
-	return $to_return;
-} ## end sub run
+	my @report_devices_output_split = split( /\n/, $report_devices_output );
+	my $devices                     = {};
+	foreach my $device_raw (@report_devices_output_split) {
+		my $device = decode_json($device_raw);
+
+		if ( defined( $device->{'applications'} ) && ( ref( $device->{'applications'} ) eq 'ARRAY' ) ) {
+			my $app_int    = 0;
+			my $app_search = 1;
+			while ( defined( $device->{'applications'}[$app_int] ) && $app_search ) {
+				if (   ( ref( $device->{'applications'}[$app_int] ) eq 'HASH' )
+					&& defined( $device->{'applications'}[$app_int]{'app_id'} )
+					&& ( ref( $device->{'applications'}[$app_int]{'app_id'} ) eq '' )
+					&& defined( $device->{'applications'}[$app_int]{'app_type'} )
+					&& ( $device->{'applications'}[$app_int]{'app_type'} eq 'logsize' )
+					&& ( ref( $device->{'applications'}[$app_int]{'app_type'} ) eq '' )
+					&& defined( $device->{'applications'}[$app_int]{'data'} )
+					&& ( ref( $device->{'applications'}[$app_int]{'data'} ) eq 'HASH' )
+					&& defined( $device->{'applications'}[$app_int]{'data'}{'sets'} )
+					&& ( ref( $device->{'applications'}[$app_int]{'data'}{'sets'} ) eq 'HASH' ) )
+				{
+					$devices->{ $device->{'hostname'} }
+						= { 'app_id' => $device->{'applications'}[$app_int]{'app_id'}, };
+				} ## end if ( ( ref( $device->{'applications'}[$app_int...])))
+
+				$app_int++;
+			} ## end while ( defined( $device->{'applications'}[$app_int...]))
+		} ## end if ( defined( $device->{'applications'} ) ...)
+	} ## end foreach my $device_raw (@report_devices_output_split)
+
+} ## end sub action
+
+sub opts_data {
+	return '
+user=s
+command=s
+ldir=s
+rdir=s
+mri
+mr=s
+sri
+sr=s
+dev=s
+';
+} ## end sub opts_data
 
 =head2
 
