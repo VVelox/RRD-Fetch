@@ -12,11 +12,32 @@ rrd_fetch_helper --help [B<-a> <action>]
 
 rrd_fetch_helper -a list_actions
 
+rrd_fetch_helper --help/-h
+
+rrd_fetch_helper --version/-v
+
 =head1 DESCRIPTION
 
+Calls various RRD::Fetch::Helper modules.
 
 =head1 FLAGS
 
+=head2 -a <action>
+
+The helper module to call.
+
+If combined with --help help info for that action is displayed.
+
+=head2 --help/-h
+
+Print the help info.
+
+If combined with -a <action>, it prints the help info for info
+for the module in question.
+
+=head2 --version/-v
+
+Print the version info.
 
 =cut
 
@@ -24,7 +45,7 @@ use strict;
 use warnings;
 use Getopt::Long qw(GetOptions);
 use Pod::Usage   qw( pod2usage );
-use RRD::Fetch::Helper;
+use RRD::Fetch::Helper ();
 use Pod::Find qw(pod_where);
 
 sub main::VERSION_MESSAGE {
@@ -36,7 +57,7 @@ my $version;
 my $action;
 Getopt::Long::Configure('no_ignore_case');
 Getopt::Long::Configure('bundling');
-use Getopt::Long qw(:config pass_through);
+Getopt::Long::Configure('pass_through');
 GetOptions(
 	'version' => \$version,
 	'v'       => \$version,
@@ -53,18 +74,8 @@ if ($version) {
 if ($help) {
 	&VERSION_MESSAGE;
 
-	print '
-
--a <action>       The action to perform.
-
-';
-
 	if ( !defined($action) ) {
-		print 'For help on a specific topic use --help with the specified action in question.
-
-For a list of actions use the action list_actions
-';
-		exit 0;
+		pod2usage( -exitval => 255, -verbose => 2, -output => \*STDOUT, );
 	}
 
 	print "Action specific help... \n\n";
@@ -74,7 +85,7 @@ For a list of actions use the action list_actions
 		-output  => \*STDOUT
 	);
 
-	exit 0;
+	exit 255;
 } ## end if ($help)
 
 my $rrd_fetch_helper=RRD::Fetch::Helper->new;

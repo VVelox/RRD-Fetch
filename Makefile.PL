@@ -1,7 +1,7 @@
 use 5.006;
 use strict;
 use warnings;
-use ExtUtils::MakeMaker;
+use ExtUtils::MakeMaker qw( WriteMakefile );
 
 my %WriteMakefileArgs = (
 	NAME               => 'RRD::Fetch',
@@ -22,6 +22,8 @@ my %WriteMakefileArgs = (
 		'String::ShellQuote' => '0',
 		'JSON'               => '0',
 		'File::Slurp'        => '0',
+		'Time::Piece'        => '0',
+		'Statistics::Lite'   => '0',
 	},
 	dist  => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
 	clean => { FILES    => 'RRD-Fetch-*' },

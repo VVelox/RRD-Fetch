@@ -1,15 +1,15 @@
-package RRD::Fetch::Helper::multi_daily_stat_simple;
+package RRD::Fetch::Helper::librenms_logsize_daily_stats;
 use base 'Error::Helper';
 
 use 5.006;
 use strict;
 use warnings;
 use String::ShellQuote qw( shell_quote );
-use JSON;
+use JSON               qw( decode_json );
 
 =head1 NAME
 
-RRD::Fetch::Helper::multi_daily_stats_simple - Fetch information from a RRD file.
+RRD::Fetch::Helper::librenms_logsize_daily_stats - Fetch information from a RRD file.
 
 =head1 VERSION
 
@@ -21,13 +21,73 @@ our $VERSION = '0.0.1';
 
 =head1 SYNOPSIS
 
+=head2 GENERAL FLAGS
 
+=head2 --dev <dev spec>
+
+A dev spec to use for when calling lnms report:devices.
+
+default: undef
+
+=head2 --dr <regex>
+
+A regex to use for matching returned device names.
+
+default: undef
+
+=head2 --dri
+
+Invert the matching for --dr.
+
+=head2 --sr <regex>
+
+A regex to use for matching logsize set names.
+
+default: undef
+
+=head2 --sri
+
+Invert the matching for --sr.
+
+=head1 CONFIG FLAGS
+
+=head2 --command <command>
+
+Command to use for accessing the LibreNMS user.
+
+'%%%user%%%' will be replaced with the user in question.
+
+default: sudo -u %%%user%%%
+
+=head2 --ldir <dir>
+
+The LibreNMS dir.
+
+If not specified, then the first directory found in the order below is used.
+
+    /home/librenms/librenms
+    /usr/local/www/librenms
+    /opt/librenms
+
+=head2 --rdir <dir>
+
+Path to the RRD dir for LibreNMS.
+
+'%%%ldir%%%' will be replace with the path for the LibreNMS dir.
+
+default: %%%ldir%%%/rrd
+
+=head2 --user <user>
+
+The user to use for LibreNMS.
+
+default: librenms
 
 =cut
 
 sub action {
 	my ( $self, %opts ) = @_;
-	
+
 	if ( !defined( $opts{'user'} ) ) {
 		$opts{'user'} = 'librenms';
 	}
@@ -81,28 +141,71 @@ sub action {
 	foreach my $device_raw (@report_devices_output_split) {
 		my $device = decode_json($device_raw);
 
-		if ( defined( $device->{'applications'} ) && ( ref( $device->{'applications'} ) eq 'ARRAY' ) ) {
-			my $app_int    = 0;
-			my $app_search = 1;
-			while ( defined( $device->{'applications'}[$app_int] ) && $app_search ) {
-				if (   ( ref( $device->{'applications'}[$app_int] ) eq 'HASH' )
-					&& defined( $device->{'applications'}[$app_int]{'app_id'} )
-					&& ( ref( $device->{'applications'}[$app_int]{'app_id'} ) eq '' )
-					&& defined( $device->{'applications'}[$app_int]{'app_type'} )
-					&& ( $device->{'applications'}[$app_int]{'app_type'} eq 'logsize' )
-					&& ( ref( $device->{'applications'}[$app_int]{'app_type'} ) eq '' )
-					&& defined( $device->{'applications'}[$app_int]{'data'} )
-					&& ( ref( $device->{'applications'}[$app_int]{'data'} ) eq 'HASH' )
-					&& defined( $device->{'applications'}[$app_int]{'data'}{'sets'} )
-					&& ( ref( $device->{'applications'}[$app_int]{'data'}{'sets'} ) eq 'HASH' ) )
-				{
-					$devices->{ $device->{'hostname'} }
-						= { 'app_id' => $device->{'applications'}[$app_int]{'app_id'}, };
-				} ## end if ( ( ref( $device->{'applications'}[$app_int...])))
+		my $process_dev = 1;
+		if ( defined( $opts{'dr'} ) ) {
+			if ( $device->{'hostname'} =~ /$opts{'dr'}/ ) {
+				if ( $opts{'dri'} ) {
+					$process_dev = 0;
+				}
+			} else {
+				if ( !$opts{'dri'} ) {
+					$process_dev = 0;
+				}
+			}
+		} ## end if ( defined( $opts{'dr'} ) )
 
-				$app_int++;
-			} ## end while ( defined( $device->{'applications'}[$app_int...]))
-		} ## end if ( defined( $device->{'applications'} ) ...)
+		if ($process_dev) {
+			if ( defined( $device->{'applications'} ) && ( ref( $device->{'applications'} ) eq 'ARRAY' ) ) {
+				my $app_int    = 0;
+				my $app_search = 1;
+				while ( defined( $device->{'applications'}[$app_int] ) && $app_search ) {
+					if (   ( ref( $device->{'applications'}[$app_int] ) eq 'HASH' )
+						&& defined( $device->{'applications'}[$app_int]{'app_id'} )
+						&& ( ref( $device->{'applications'}[$app_int]{'app_id'} ) eq '' )
+						&& defined( $device->{'applications'}[$app_int]{'app_type'} )
+						&& ( $device->{'applications'}[$app_int]{'app_type'} eq 'logsize' )
+						&& ( ref( $device->{'applications'}[$app_int]{'app_type'} ) eq '' )
+						&& defined( $device->{'applications'}[$app_int]{'data'} )
+						&& ( ref( $device->{'applications'}[$app_int]{'data'} ) eq 'HASH' )
+						&& defined( $device->{'applications'}[$app_int]{'data'}{'sets'} )
+						&& ( ref( $device->{'applications'}[$app_int]{'data'}{'sets'} ) eq 'HASH' ) )
+					{
+						my @found_sets = keys( %{ $device->{'applications'}[$app_int]{'data'}{'sets'} } );
+
+						my @sets;
+						if ( !defined( $opts{'sr'} ) ) {
+							@sets = @found_sets;
+						} else {
+							foreach my $set (@found_sets) {
+								my $add_set = 1;
+								if ( $set =~ /$opts{'sr'}/ ) {
+									if ( $opts{'sri'} ) {
+										$add_set = 0;
+									}
+								} else {
+									if ( !$opts{'sri'} ) {
+										$add_set = 0;
+									}
+								}
+								if ($add_set) {
+									push( @sets, $set );
+								}
+							} ## end foreach my $set (@found_sets)
+
+							if ( defined( $sets[0] ) ) {
+								$devices->{ $device->{'hostname'} } = {
+									'app_id' => $device->{'applications'}[$app_int]{'app_id'},
+									'sets'   => \@sets,
+								};
+							}
+						} ## end else [ if ( !defined( $opts{'sr'} ) ) ]
+
+					} ## end if ( ( ref( $device->{'applications'}[$app_int...])))
+
+					$app_int++;
+				} ## end while ( defined( $device->{'applications'}[$app_int...]))
+			} ## end if ( defined( $device->{'applications'} ) ...)
+		} ## end if ($process_dev)
 	} ## end foreach my $device_raw (@report_devices_output_split)
 
 } ## end sub action
@@ -113,74 +216,12 @@ user=s
 command=s
 ldir=s
 rdir=s
-mri
-mr=s
+dri
+dr=s
 sri
 sr=s
 dev=s
 ';
 } ## end sub opts_data
-
-=head2
-
-=head1 ERROR CODES/FLAGS
-
-=head2 1/rrd_file_undef
-
-The value given for rrd_file is undef.
-
-=head2 2/wrong_ref_type
-
-The specified variable is of the wrong ref type.
-
-=head2 3/rrd_fetcher_init_error
-
-Failed to init RRD::Fetcher for a file.
-
-=head1 AUTHOR
-
-Zane C. Bowers-Hadley, C<< <vvelox at vvelox.net> >>
-
-=head1 BUGS
-
-Please report any bugs or feature requests to C<bug-rrd-fetch at rt.cpan.org>, or through
-the web interface at L<https://rt.cpan.org/NoAuth/ReportBug.html?Queue=RRD-Fetch>.  I will be notified, and then you'll
-automatically be notified of progress on your bug as I make changes.
-
-=head1 SUPPORT
-
-You can find documentation for this module with the perldoc command.
-
-    perldoc RRD::Fetch
-
-
-You can also look for information at:
-
-=over 4
-
-=item * RT: CPAN's request tracker (report bugs here)
-
-L<https://rt.cpan.org/NoAuth/Bugs.html?Dist=RRD-Fetch>
-
-=item * CPAN Ratings
-
-L<https://cpanratings.perl.org/d/RRD-Fetch>
-
-=item * Search CPAN
-
-L<https://metacpan.org/release/RRD-Fetch>
-
-=back
-
-=head1 LICENSE AND COPYRIGHT
-
-This software is Copyright (c) 2025 by Zane C. Bowers-Hadley.
-
-This is free software, licensed under:
-
-  The GNU General Public License, Version 2, June 1991
-
-
-=cut
 
 1;    # End of RRD::Fetch
