@@ -139,7 +139,13 @@ sub action {
 	my @report_devices_output_split = split( /\n/, $report_devices_output );
 	my $devices                     = {};
 	foreach my $device_raw (@report_devices_output_split) {
-		my $device = decode_json($device_raw);
+		my $device;
+		eval{
+			$device = decode_json($device_raw);
+		};
+		if ($@){
+			die('Got bad JSON... "'.$report_devices_output.'" from the command "'.$report_devices_command.'"');
+		}
 
 		my $process_dev = 1;
 		if ( defined( $opts{'dr'} ) ) {
