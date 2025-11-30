@@ -181,7 +181,7 @@ sub action {
 						my @found_sets = keys( %{ $device->{'applications'}[$app_int]{'data'}{'sets'} } );
 
 						my @sets;
-						if ( !defined( $opts{'sr'} ) ) {
+						if ( !defined( $opts{'opts'}{'sr'} ) ) {
 							@sets = @found_sets;
 						} else {
 							foreach my $set (@found_sets) {
