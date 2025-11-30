@@ -88,46 +88,46 @@ default: librenms
 sub action {
 	my ( $self, %opts ) = @_;
 
-	if ( !defined( $opts{'user'} ) ) {
-		$opts{'user'} = 'librenms';
+	if ( !defined( $opts{'opts'}{'user'} ) ) {
+		$opts{'opts'}{'user'} = 'librenms';
 	}
 
-	if ( !defined( $opts{'command'} ) ) {
-		$opts{'command'} = 'sudo -u %%%user%%%';
+	if ( !defined( $opts{'opts'}{'command'} ) ) {
+		$opts{'opts'}{'command'} = 'sudo -u %%%user%%%';
 	}
 
-	if ( !defined( $opts{'ldir'} ) ) {
+	if ( !defined( $opts{'opts'}{'ldir'} ) ) {
 		if ( -d '/home/librenms/librenms' ) {
-			$opts{'ldir'} = '/home/librenms/librenms';
+			$opts{'opts'}{'ldir'} = '/home/librenms/librenms';
 		} elsif ( -d '/usr/local/www/librenms' ) {
-			$opts{'ldir'} = '/usr/local/www/librenms';
+			$opts{'opts'}{'ldir'} = '/usr/local/www/librenms';
 		} else {
-			$opts{'ldir'} = '/opt/librenms';
+			$opts{'opts'}{'ldir'} = '/opt/librenms';
 		}
 	}
-	if ( !-d $opts{'ldir'} ) {
-		die( '--ldir, "' . $opts{'ldir'} . '", is not a dir or does not exist' );
+	if ( !-d $opts{'opts'}{'ldir'} ) {
+		die( '--ldir, "' . $opts{'opts'}{'ldir'} . '", is not a dir or does not exist' );
 	}
 
-	my $lnms = $opts{'ldir'} . '/lnms';
+	my $lnms = $opts{'opts'}{'ldir'} . '/lnms';
 	if ( !-f $lnms ) {
 		die( '"' . $lnms . '" is not a file or does not exist' );
 	} elsif ( !-x $lnms ) {
 		die( '"' . $lnms . '" is not executable' );
 	}
 
-	if ( !defined( $opts{'rdir'} ) ) {
-		$opts{'rdir'} = '%%%ldir%%%/rrd';
+	if ( !defined( $opts{'opts'}{'rdir'} ) ) {
+		$opts{'opts'}{'rdir'} = '%%%ldir%%%/rrd';
 	}
-	$opts{'rdir'} =~ s/\%\%\%ldir\%\%\%/$opts{'ldir'}/g;
+	$opts{'opts'}{'rdir'} =~ s/\%\%\%ldir\%\%\%/$opts{'ldir'}/g;
 
-	my $command = $opts{'command'};
+	my $command = $opts{'opts'}{'command'};
 	$command =~ s/\%\%\%user\%\%\%/$opts{'user'}/g;
 	$command = $command . ' ' . $lnms;
 
 	my $report_devices_command = $command . ' report:devices -o json -r applications';
-	if ( defined( $opts{'dev'} ) ) {
-		$report_devices_command = $report_devices_command . ' ' . shell_quote( $opts{'dev'} );
+	if ( defined( $opts{'opts'}{'dev'} ) ) {
+		$report_devices_command = $report_devices_command . ' ' . shell_quote( $opts{'opts'}{'dev'} );
 	}
 	$report_devices_command = $report_devices_command . ' 2>&1';
 
@@ -150,13 +150,13 @@ sub action {
 		}
 
 		my $process_dev = 1;
-		if ( defined( $opts{'dr'} ) ) {
-			if ( $device->{'hostname'} =~ /$opts{'dr'}/ ) {
-				if ( $opts{'dri'} ) {
+		if ( defined( $opts{'opts'}{'dr'} ) ) {
+			if ( $device->{'hostname'} =~ /$opts{'opts'}{'dr'}/ ) {
+				if ( $opts{'opts'}{'dri'} ) {
 					$process_dev = 0;
 				}
 			} else {
-				if ( !$opts{'dri'} ) {
+				if ( !$opts{'opts'}{'dri'} ) {
 					$process_dev = 0;
 				}
 			}
@@ -186,12 +186,12 @@ sub action {
 						} else {
 							foreach my $set (@found_sets) {
 								my $add_set = 1;
-								if ( $set =~ /$opts{'sr'}/ ) {
-									if ( $opts{'sri'} ) {
+								if ( $set =~ /$opts{'opts'}{'sr'}/ ) {
+									if ( $opts{'opts'}{'sri'} ) {
 										$add_set = 0;
 									}
 								} else {
-									if ( !$opts{'sri'} ) {
+									if ( !$opts{'opts'}{'sri'} ) {
 										$add_set = 0;
 									}
 								}
