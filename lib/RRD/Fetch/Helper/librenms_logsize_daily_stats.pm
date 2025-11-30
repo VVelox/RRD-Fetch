@@ -119,10 +119,10 @@ sub action {
 	if ( !defined( $opts{'opts'}{'rdir'} ) ) {
 		$opts{'opts'}{'rdir'} = '%%%ldir%%%/rrd';
 	}
-	$opts{'opts'}{'rdir'} =~ s/\%\%\%ldir\%\%\%/$opts{'ldir'}/g;
+	$opts{'opts'}{'rdir'} =~ s/\%\%\%ldir\%\%\%/$opts{'opts'}{'ldir'}/g;
 
 	my $command = $opts{'opts'}{'command'};
-	$command =~ s/\%\%\%user\%\%\%/$opts{'user'}/g;
+	$command =~ s/\%\%\%user\%\%\%/$opts{'opts'}{'user'}/g;
 	$command = $command . ' ' . $lnms;
 
 	my $report_devices_command = $command . ' report:devices -o json -r applications';
