@@ -140,11 +140,13 @@ sub action {
 	my $devices                     = {};
 	foreach my $device_raw (@report_devices_output_split) {
 		my $device;
-		eval{
-			$device = decode_json($device_raw);
-		};
-		if ($@){
-			die('Got bad JSON... "'.$report_devices_output.'" from the command "'.$report_devices_command.'"');
+		eval { $device = decode_json($device_raw); };
+		if ($@) {
+			die(      'Got bad JSON... "'
+					. $report_devices_output
+					. '" from the command "'
+					. $report_devices_command
+					. '"' );
 		}
 
 		my $process_dev = 1;
@@ -197,14 +199,14 @@ sub action {
 									push( @sets, $set );
 								}
 							} ## end foreach my $set (@found_sets)
-
-							if ( defined( $sets[0] ) ) {
-								$devices->{ $device->{'hostname'} } = {
-									'app_id' => $device->{'applications'}[$app_int]{'app_id'},
-									'sets'   => \@sets,
-								};
-							}
 						} ## end else [ if ( !defined( $opts{'sr'} ) ) ]
+
+						if ( defined( $sets[0] ) ) {
+							$devices->{ $device->{'hostname'} } = {
+								'app_id' => $device->{'applications'}[$app_int]{'app_id'},
+								'sets'   => \@sets,
+							};
+						}
 
 					} ## end if ( ( ref( $device->{'applications'}[$app_int...])))
 
