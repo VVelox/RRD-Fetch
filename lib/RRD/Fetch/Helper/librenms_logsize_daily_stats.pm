@@ -125,7 +125,7 @@ sub action {
 	$command =~ s/\%\%\%user\%\%\%/$opts{'user'}/g;
 	$command = $command . ' ' . $lnms;
 
-	my $report_devices_command = $command . ' report:devices -r applications';
+	my $report_devices_command = $command . ' report:devices -o json -r applications';
 	if ( defined( $opts{'dev'} ) ) {
 		$report_devices_command = $report_devices_command . ' ' . shell_quote( $opts{'dev'} );
 	}
