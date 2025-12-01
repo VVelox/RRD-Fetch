@@ -8,7 +8,7 @@ rrd_fetch_helper -
 
 rrd_fetch_helper -a <action> ...
 
-rrd_fetch_helper --help [B<-a> <action>]
+rrd_fetch_helper --help [B<-a> <action>] [B<-j>] <action args>
 
 rrd_fetch_helper -a list_actions
 
@@ -28,6 +28,10 @@ The helper module to call.
 
 If combined with --help help info for that action is displayed.
 
+=head2 -j
+
+Print the data returned from the action as JSON instead of what ever it specifies for the output.
+
 =head2 --help/-h
 
 Print the help info.
@@ -43,10 +47,10 @@ Print the version info.
 
 use strict;
 use warnings;
-use Getopt::Long qw(GetOptions);
-use Pod::Usage   qw( pod2usage );
+use Getopt::Long       qw(GetOptions);
+use Pod::Usage         qw( pod2usage );
 use RRD::Fetch::Helper ();
-use Pod::Find qw(pod_where);
+use Pod::Find          qw(pod_where);
 
 sub main::VERSION_MESSAGE {
 	print 'rrd_fetch_helper v. ' . $RRD::Fetch::Helper::VERSION . "\n";
@@ -55,6 +59,7 @@ sub main::VERSION_MESSAGE {
 my $help;
 my $version;
 my $action;
+my $as_json;
 Getopt::Long::Configure('no_ignore_case');
 Getopt::Long::Configure('bundling');
 Getopt::Long::Configure('pass_through');
@@ -63,7 +68,8 @@ GetOptions(
 	'v'       => \$version,
 	'help'    => \$help,
 	'h'       => \$help,
-	'a=s' => \$action,
+	'a=s'     => \$action,
+	'j'       => \$as_json,
 );
 
 if ($version) {
@@ -88,5 +94,12 @@ if ($help) {
 	exit 255;
 } ## end if ($help)
 
-my $rrd_fetch_helper=RRD::Fetch::Helper->new;
-$rrd_fetch_helper->run('action'=>$action);
+my $rrd_fetch_helper = RRD::Fetch::Helper->new;
+my $returned         = $rrd_fetch_helper->run( 'action' => $action );
+
+if ($as_json) {
+	print JSON->new->allow_nonref->canonical(1)->encode($returned);
+	exit 0;
+}
+print $returned->{'output'};
+
