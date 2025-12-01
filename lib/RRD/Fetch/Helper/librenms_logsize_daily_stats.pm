@@ -269,6 +269,8 @@ sub action {
 				}
 
 				$to_return->{'data'}{$date}{$devset} = $daily_stats->{'max'}{$date}{'max_size'};
+				# can't be less than a byte, so just loss anything after the decimal place for simplicity purposes
+				$to_return->{'data'}{$date}{$devset}=~s/\.*$//g;
 			}
 		} ## end foreach my $set ( sort @{ $devices->{$device}{'sets'...}})
 	} ## end foreach my $device (@device_keys)
