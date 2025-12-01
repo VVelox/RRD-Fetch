@@ -11,7 +11,7 @@ my %WriteMakefileArgs = (
 	LICENSE            => 'gpl_2',
 	MIN_PERL_VERSION   => '5.006',
 	INST_SCRIPT        => 'bin',
-	EXE_FILES          => [ 'src_bin/rrd_fetch', ],
+	EXE_FILES          => [ 'src_bin/rrd_fetch', 'src_bin/rrd_fetch_helper' ],
 	CONFIGURE_REQUIRES => {
 		'ExtUtils::MakeMaker' => '0',
 	},
