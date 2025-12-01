@@ -254,7 +254,7 @@ sub action {
 		foreach my $set ( sort @{ $devices->{$device}{'sets'} } ) {
 			my $set_filename_part=$set;
 			$set_filename_part=~s/[\\\/\ ]/\_/g;
-			my $rrd         = $base_dir . '/app-logsize-' . $devices->{$device}{'app_id'} . '-' . $set . '.rrd';
+			my $rrd         = $base_dir . '/app-logsize-' . $devices->{$device}{'app_id'} . '-' . $set_filename_part . '.rrd';
 			my $rrd_fetch   = RRD::Fetch->new( 'CF' => 'MAX', 'rrd_file' => $rrd );
 			my $daily_stats = $rrd_fetch->daily_stats( 'start' => $opts{'opts'}{'s'}, 'for' => $opts{'opts'}{'f'} );
 
