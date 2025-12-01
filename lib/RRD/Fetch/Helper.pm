@@ -126,7 +126,7 @@ sub run {
 		$self->warn;
 	}
 
-	my $to_return;
+	return $action_return;
 } ## end sub run
 
 =head2
