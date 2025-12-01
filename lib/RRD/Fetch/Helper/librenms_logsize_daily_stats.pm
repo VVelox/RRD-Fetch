@@ -327,7 +327,7 @@ sub action {
 		push( @modes,   $mode );
 	} ## end foreach my $date ( @{ $to_return->{'dates'} } )
 
-	my $blank_space = ',';
+	my $blank_space = '';
 	foreach ( @{ $to_return->{'dev-sets'} } ) {
 		$blank_space = $blank_space . ',';
 	}
