@@ -308,7 +308,7 @@ sub action {
 			$sum    = sum(@day_values);
 			$min    = min(@day_values);
 			$max    = max(@day_values);
-r			$mean   = mean(@day_values);
+			$mean   = mean(@day_values);
 			$median = median(@day_values);
 			$mode   = mode(@day_values);
 		}
