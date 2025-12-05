@@ -8,6 +8,7 @@ use String::ShellQuote qw( shell_quote );
 use JSON               qw( decode_json );
 use RRD::Fetch         ();
 use Statistics::Lite   qw(max mean median min mode sum);
+use Scalar::Util       qw(looks_like_number);
 
 =head1 NAME
 
@@ -32,6 +33,13 @@ Start time to use.
 =head2 -f <days>
 
 How many days to fetch info for.
+
+=head2 -d <number>
+
+Divide the results by this number.
+
+Use this flag for coverting the results to like GiB via 100000000
+or GB via 1073741824.
 
 =head2 SELECTION FLAGS
 
@@ -99,6 +107,14 @@ default: librenms
 
 sub action {
 	my ( $self, %opts ) = @_;
+
+	if ( defined( $opts{'opts'}{'d'} ) ) {
+		if ( !looks_like_number( $opts{'opts'}{'d'} ) ) {
+			die( '-d, "' . $opts{'opts'}{'d'} . '", is not a number' );
+		} elsif ( $opts{'opts'}{'d'} == 0 ) {
+			die( '-d, "' . $opts{'opts'}{'d'} . '", may not be 0' );
+		}
+	}
 
 	if ( !defined( $opts{'opts'}{'s'} ) ) {
 		die('-s is undef... this should be used for specify the start time');
@@ -252,9 +268,9 @@ sub action {
 	foreach my $device (@device_keys) {
 		my $base_dir = $opts{'opts'}{'rdir'} . '/' . $device;
 		foreach my $set ( sort @{ $devices->{$device}{'sets'} } ) {
-			my $set_filename_part=$set;
-			$set_filename_part=~s/[\\\/\ \+]/\_/g;
-			my $rrd         = $base_dir . '/app-logsize-' . $devices->{$device}{'app_id'} . '-' . $set_filename_part . '.rrd';
+			my $set_filename_part = $set;
+			$set_filename_part =~ s/[\\\/\ \+]/\_/g;
+			my $rrd = $base_dir . '/app-logsize-' . $devices->{$device}{'app_id'} . '-' . $set_filename_part . '.rrd';
 			my $rrd_fetch   = RRD::Fetch->new( 'CF' => 'MAX', 'rrd_file' => $rrd );
 			my $daily_stats = $rrd_fetch->daily_stats( 'start' => $opts{'opts'}{'s'}, 'for' => $opts{'opts'}{'f'} );
 
@@ -270,8 +286,12 @@ sub action {
 
 				$to_return->{'data'}{$date}{$devset} = $daily_stats->{'max'}{$date}{'size'};
 				# can't be less than a byte, so just loss anything after the decimal place for simplicity purposes
-				$to_return->{'data'}{$date}{$devset}=~s/\..*$//g;
-			}
+				$to_return->{'data'}{$date}{$devset} =~ s/\..*$//g;
+
+				if ( defined( $opts{'opts'}{'d'} ) && $to_return->{'data'}{$date}{$devset} != 0 ) {
+					$to_return->{'data'}{$date}{$devset} = $to_return->{'data'}{$date}{$devset} / $opts{'opts'}{'d'};
+				}
+			} ## end foreach my $date ( @{ $daily_stats->{'dates'} })
 		} ## end foreach my $set ( sort @{ $devices->{$device}{'sets'...}})
 	} ## end foreach my $device (@device_keys)
 	my @dates_keys = sort( keys(%dates) );
@@ -523,6 +543,7 @@ sr=s
 dev=s
 s=s
 f=s
+d=s
 ';
 } ## end sub opts_data
 
