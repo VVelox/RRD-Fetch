@@ -38,7 +38,7 @@ How many days to fetch info for.
 
 Divide the results by this number.
 
-Use this flag for coverting the results to like GiB via 100000000
+Use this flag for coverting the results to like GiB via 1000000000
 or GB via 1073741824.
 
 =head2 SELECTION FLAGS
