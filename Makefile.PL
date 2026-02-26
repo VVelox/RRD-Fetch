@@ -24,9 +24,24 @@ my %WriteMakefileArgs = (
 		'File::Slurp'        => '0',
 		'Time::Piece'        => '0',
 		'Statistics::Lite'   => '0',
+		'Pod::Find'          => '0',
+		'Statistics::Lite'   => '0',
+		'Time::Piece'        => '0',
+		'Pod::Usage'         => '0',
+		'Scalar::Util'       => '0',
 	},
 	dist  => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
 	clean => { FILES    => 'RRD-Fetch-*' },
+	META_MERGE => {
+		"meta-spec" => { version => 2 },
+			resources   => {
+				repository => {
+					type => 'git',
+					url  => 'git@github.com:VVelox/RRD-Fetch.git',
+					web  => 'https://github.com/VVelox/RRD-Fetch',
+				},
+		},
+	}
 );
 
 # Compatibility with old versions of ExtUtils::MakeMaker

@@ -2,7 +2,7 @@
 
 =head1 NAME
 
-rrd_fetch_helper - 
+rrd_fetch_helper - All various RRD::Fetch::Helper modules.
 
 =head1 SYNOPSIS
 
